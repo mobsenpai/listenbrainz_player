@@ -3,14 +3,12 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "lb-cli"
+name = "lb"
 version = "0.1.0"
-description = "CLI/TUI music player with ListenBrainz integration"
+description = "ListenBrainz TUI music player"
 readme = "README.md"
 license = {text = "MIT"}
-authors = [
-    {name = "mobsenpai"}
-]
+authors = [{name = "mobsenpai"}]
 dependencies = [
     "requests",
     "yt-dlp",
@@ -19,9 +17,8 @@ dependencies = [
 requires-python = ">=3.9"
 
 [project.scripts]
-lb = "lb_cli.cli:main"
-lb-tui = "lb_cli.tui:main"
+lb = "lb.tui:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["lb_cli*"]
+include = ["lb*"]

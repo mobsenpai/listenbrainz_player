@@ -1,5 +1,5 @@
 {
-  description = "ListenBrainz CLI/TUI music player";
+  description = "ListenBrainz TUI music player";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -20,11 +20,10 @@
           requests
           yt-dlp
           prompt-toolkit
-          troi
         ]);
 
-      lb-cli = python.pkgs.buildPythonPackage {
-        pname = "lb-cli";
+      lb-tui = python.pkgs.buildPythonPackage {
+        pname = "lb";
         version = "0.1.0";
         src = ./.;
         propagatedBuildInputs = with python.pkgs; [
@@ -33,13 +32,13 @@
           prompt-toolkit
         ];
         meta = {
-          description = "ListenBrainz CLI/TUI music player";
+          description = "ListenBrainz TUI music player";
           license = pkgs.lib.licenses.mit;
           mainProgram = "lb";
         };
       };
     in {
-      packages.default = lb-cli;
+      packages.default = lb-tui;
 
       devShells.default = pkgs.mkShell {
         buildInputs = [
@@ -49,7 +48,6 @@
         ];
 
         shellHook = ''
-          # Load environment variables from .env if it exists
           if [ -f .env ]; then
             export $(grep -v '^#' .env | xargs)
             echo "✅ Loaded credentials from .env"
@@ -57,22 +55,12 @@
             echo "⚠️  .env file not found. Create one from .env.template"
           fi
 
-          # Add the current directory to PYTHONPATH so Python can find lb_cli
           export PYTHONPATH="$PWD:$PYTHONPATH"
+          alias lb='python -m lb'
 
-          # Create convenient aliases
-          alias lb='python -m lb_cli'
-          alias lb-tui='python -m lb_cli.tui'
-
-          echo "🎵 ListenBrainz CLI Music Environment"
+          echo "🎵 ListenBrainz TUI Music Player"
           echo ""
-          echo "✅ Ready! Available commands:"
-          echo "  lb play \"Artist Title\""
-          echo "  lb liked"
-          echo "  lb weekly"
-          echo "  lb-tui liked"
-          echo "  lb-tui weekly"
-          echo "  lb-tui playlist <mbid>"
+          echo "✅ Ready! Launch with: lb"
           echo ""
         '';
       };

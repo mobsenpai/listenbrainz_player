@@ -4,8 +4,8 @@ import subprocess
 import yt_dlp
 from .api import submit_now_playing, submit_listen
 
-def search_url(track):
-    """Get YouTube URL for a track."""
+def search_track_info(track):
+    """Return (url, title) for a YouTube video matching the query."""
     clean = track.split(' - Topic')[0]
     query = f"ytsearch1:{clean} Official Audio"
     with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
@@ -13,10 +13,16 @@ def search_url(track):
             info = ydl.extract_info(query, download=False)
             entries = info.get('entries', [])
             if entries:
-                return entries[0]['webpage_url']
+                video = entries[0]
+                return video['webpage_url'], video.get('title', clean)
         except Exception:
             pass
-    return None
+    return None, None
+
+def search_url(track):
+    """Legacy wrapper – used by other modules."""
+    url, _ = search_track_info(track)
+    return url
 
 def search_and_play(query):
     """Search YouTube and play the first result with mpv."""
@@ -39,7 +45,6 @@ def search_and_play(query):
             print(f"🎬 Playing: {title}")
             submit_now_playing(artist, track)
 
-            # Start mpv in a new process group so Ctrl+C kills it cleanly
             proc = subprocess.Popen(
                 ["mpv", "--no-video", url],
                 preexec_fn=os.setsid,
@@ -96,3 +101,24 @@ def play_tracks(tracks):
             break
 
         submit_listen(artist, title)
+
+def search_tracks(query, limit=10):
+    """Return a list of (title, webpage_url) for a YouTube search."""
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'extract_flat': True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        try:
+            info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+            results = []
+            for entry in info.get('entries', []):
+                if entry:
+                    title = entry.get('title')
+                    url = entry.get('url')
+                    if title and url:
+                        results.append((title, url))
+            return results
+        except Exception:
+            return []

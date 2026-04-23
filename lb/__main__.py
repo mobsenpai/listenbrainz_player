@@ -1,4 +1,4 @@
-from lb_cli.cli import main
+from .tui import main
 
 if __name__ == "__main__":
     main()

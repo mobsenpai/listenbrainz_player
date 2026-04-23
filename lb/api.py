@@ -28,7 +28,7 @@ def submit_listen(artist_name, track_name, listened_at=None):
         print(f"❌ Scrobble failed: {resp.text}")
 
 def submit_now_playing(artist_name, track_name):
-    """Submit a 'now playing' notification."""
+    """Submit a 'now playing' notification. Use clear_now_playing() to remove status."""
     if not LISTENBRAINZ_TOKEN:
         return
     payload = {
@@ -42,10 +42,22 @@ def submit_now_playing(artist_name, track_name):
     }
     headers = {"Authorization": f"Token {LISTENBRAINZ_TOKEN}", "User-Agent": USER_AGENT}
     resp = requests.post(f"{LISTENBRAINZ_API_URL}/submit-listens", json=payload, headers=headers)
-    if resp.status_code == 200:
-        print(f"🎵 Now playing: {artist_name} - {track_name}")
-    else:
+    if resp.status_code != 200:
         print(f"❌ Now playing update failed: {resp.text}")
+
+def clear_now_playing():
+    """Remove the now‑playing status from ListenBrainz."""
+    if not LISTENBRAINZ_TOKEN:
+        return
+    # Send a playing_now with no track_metadata – this clears the status
+    payload = {
+        "listen_type": "playing_now",
+        "payload": [{}]
+    }
+    headers = {"Authorization": f"Token {LISTENBRAINZ_TOKEN}", "User-Agent": USER_AGENT}
+    resp = requests.post(f"{LISTENBRAINZ_API_URL}/submit-listens", json=payload, headers=headers)
+    if resp.status_code != 200:
+        print(f"❌ Clear now playing failed: {resp.text}")
 
 def get_playlist_tracks(playlist_mbid):
     """Fetch tracks from a ListenBrainz playlist by its MBID (UUID) or full URL."""
@@ -65,17 +77,16 @@ def get_playlist_tracks(playlist_mbid):
     return tracks
 
 def get_liked_tracks():
-    """Fetch liked tracks for the default user."""
+    """Fetch liked tracks for the default user. Raises on API errors."""
     if not DEFAULT_USERNAME:
-        print("❌ LB_USERNAME not set.")
-        return []
+        raise ValueError("LB_USERNAME not set")
     username = DEFAULT_USERNAME
     url = f"{LISTENBRAINZ_API_URL}/feedback/user/{username}/get-feedback"
     headers = {"Authorization": f"Token {LISTENBRAINZ_TOKEN}"} if LISTENBRAINZ_TOKEN else {}
     params = {"score": 1, "count": 500}
     resp = requests.get(url, headers=headers, params=params)
     if resp.status_code != 200:
-        return []
+        raise ConnectionError(f"API error {resp.status_code}: {resp.text}")
     data = resp.json()
     feedback_items = data.get('feedback', [])
     cache = load_cache()
@@ -126,26 +137,71 @@ def get_liked_tracks():
     return ordered
 
 def get_weekly_tracks():
-    """Return tracks for the default user's weekly jams playlist."""
+    """Return tracks for the user's Weekly Jams playlist (auto‑generated)."""
     if not DEFAULT_USERNAME:
-        print("❌ LB_USERNAME not set.")
-        return []
+        raise ValueError("LB_USERNAME not set")
     username = DEFAULT_USERNAME
-    # Use hardcoded MBID for mobsenpai; fallback to searching user playlists
-    if username == "mobsenpai":
-        return get_playlist_tracks(WEEKLY_JAMS_MBID)
-    # Fallback: search for "Weekly Jams" in user's playlists
-    url = f"{LISTENBRAINZ_API_URL}/user/{username}/playlists"
+    url = f"{LISTENBRAINZ_API_URL}/user/{username}/playlists/createdfor"
     headers = {"Authorization": f"Token {LISTENBRAINZ_TOKEN}"} if LISTENBRAINZ_TOKEN else {}
-    params = {"count": 100}
+    resp = requests.get(url, headers=headers)
+    if resp.status_code != 200:
+        raise ConnectionError(f"API error {resp.status_code}: {resp.text}")
+    data = resp.json()
+    playlists = data.get("playlists", [])
+    # Find the first playlist whose title starts with "Weekly Jams for "
+    for item in playlists:
+        p = item.get("playlist", {})
+        title = p.get("title", "")
+        if title.startswith("Weekly Jams for "):
+            identifier = p.get("identifier", "")
+            if identifier.startswith("http"):
+                identifier = identifier.split("/")[-1]
+            return get_playlist_tracks(identifier)
+    # Fallback: try the hardcoded MBID (specific to mobsenpai)
+    return get_playlist_tracks(WEEKLY_JAMS_MBID)
+
+def get_user_playlists():
+    """Return list of (title, identifier) for the user's playlists."""
+    if not DEFAULT_USERNAME:
+        raise ValueError("LB_USERNAME not set")
+    url = f"{LISTENBRAINZ_API_URL}/user/{DEFAULT_USERNAME}/playlists"
+    headers = {"Authorization": f"Token {LISTENBRAINZ_TOKEN}"} if LISTENBRAINZ_TOKEN else {}
+    params = {"count": 100}   # adjust if you have more
     resp = requests.get(url, headers=headers, params=params)
-    if resp.status_code == 200:
-        data = resp.json()
-        for item in data.get('playlists', []):
-            p = item.get('playlist', {})
-            if 'Weekly Jams' in p.get('title', ''):
-                identifier = p.get('identifier', '')
-                if identifier.startswith("http"):
-                    return get_playlist_tracks(identifier.split("/")[-1])
-                return get_playlist_tracks(identifier)
+    if resp.status_code != 200:
+        raise ConnectionError(f"API error {resp.status_code}: {resp.text}")
+    data = resp.json()
+    playlists = []
+    for item in data.get('playlists', []):
+        p = item.get('playlist', {})
+        title = p.get('title', 'Untitled')
+        mbid = p.get('identifier', '')   # full URL
+        if not mbid:
+            continue
+        # extract UUID from URL if needed
+        if mbid.startswith("http"):
+            mbid = mbid.split("/")[-1]
+        playlists.append((title, mbid))
+    return playlists
+
+def get_weekly_exploration_tracks():
+    """Return tracks for the user's Weekly Exploration playlist (auto‑generated)."""
+    if not DEFAULT_USERNAME:
+        raise ValueError("LB_USERNAME not set")
+    username = DEFAULT_USERNAME
+    url = f"{LISTENBRAINZ_API_URL}/user/{username}/playlists/createdfor"
+    headers = {"Authorization": f"Token {LISTENBRAINZ_TOKEN}"} if LISTENBRAINZ_TOKEN else {}
+    resp = requests.get(url, headers=headers)
+    if resp.status_code != 200:
+        raise ConnectionError(f"API error {resp.status_code}: {resp.text}")
+    data = resp.json()
+    playlists = data.get("playlists", [])
+    for item in playlists:
+        p = item.get("playlist", {})
+        title = p.get("title", "")
+        if title.startswith("Weekly Exploration for "):
+            identifier = p.get("identifier", "")
+            if identifier.startswith("http"):
+                identifier = identifier.split("/")[-1]
+            return get_playlist_tracks(identifier)
     return []

@@ -19,3 +19,4 @@ if not LISTENBRAINZ_TOKEN:
     print("⚠️  LISTENBRAINZ_TOKEN is not set. Scrobbling and API calls will fail.")
 if not DEFAULT_USERNAME:
     print("⚠️  LB_USERNAME is not set. Playlist/liked features won't work.")
+SCROBBLE_THRESHOLD = 30   # change to 0 to disable threshold
