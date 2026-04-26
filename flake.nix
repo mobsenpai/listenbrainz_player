@@ -13,39 +13,36 @@
   }:
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-      python = pkgs.python3;
-
-      pythonEnv = python.withPackages (ps:
-        with ps; [
-          requests
-          yt-dlp
-          prompt-toolkit
-        ]);
-
-      lb-tui = python.pkgs.buildPythonPackage {
+      inherit (pkgs) python3;
+      inherit (python3.pkgs) buildPythonPackage setuptools wheel requests prompt-toolkit;
+    in {
+      packages.default = buildPythonPackage {
         pname = "lb";
         version = "0.1.0";
         pyproject = true;
+
         src = ./.;
-        propagatedBuildInputs = with python.pkgs; [
-          requests
-          yt-dlp
-          prompt-toolkit
-        ];
-        meta = {
+
+        nativeBuildInputs = [setuptools wheel];
+        propagatedBuildInputs = [requests prompt-toolkit];
+
+        postInstall = ''
+          wrapProgram $out/bin/lb \
+            --prefix PATH : ${pkgs.yt-dlp}/bin
+        '';
+
+        meta = with pkgs.lib; {
           description = "ListenBrainz TUI music player";
-          license = pkgs.lib.licenses.mit;
+          license = licenses.mit;
           mainProgram = "lb";
         };
       };
-    in {
-      packages.default = lb-tui;
 
       devShells.default = pkgs.mkShell {
         buildInputs = [
-          pythonEnv
-          pkgs.mpv
+          (python3.withPackages (ps: with ps; [requests prompt-toolkit]))
           pkgs.yt-dlp
+          pkgs.mpv
         ];
 
         shellHook = ''
@@ -62,7 +59,6 @@
           echo "🎵 ListenBrainz TUI Music Player"
           echo ""
           echo "✅ Ready! Launch with: lb"
-          echo ""
         '';
       };
     });
