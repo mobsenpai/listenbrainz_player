@@ -24,15 +24,7 @@
         src = ./.;
 
         nativeBuildInputs = [setuptools wheel];
-        propagatedBuildInputs = [requests prompt-toolkit];
-
-        doCheck = false;
-        pythonRuntimeDepsCheck = false;
-
-        postInstall = ''
-          wrapProgram $out/bin/lb \
-            --prefix PATH : ${pkgs.yt-dlp}/bin
-        '';
+        propagatedBuildInputs = [requests prompt-toolkit pkgs.yt-dlp];
 
         meta = with pkgs.lib; {
           description = "ListenBrainz TUI music player";
@@ -43,8 +35,7 @@
 
       devShells.default = pkgs.mkShell {
         buildInputs = [
-          (python3.withPackages (ps: with ps; [requests prompt-toolkit]))
-          pkgs.yt-dlp
+          (python3.withPackages (ps: with ps; [requests prompt-toolkit yt-dlp]))
           pkgs.mpv
         ];
 
