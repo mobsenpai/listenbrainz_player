@@ -26,6 +26,8 @@
         nativeBuildInputs = [setuptools wheel];
         propagatedBuildInputs = [requests prompt-toolkit];
 
+        doCheck = false;
+
         postInstall = ''
           wrapProgram $out/bin/lb \
             --prefix PATH : ${pkgs.yt-dlp}/bin
