@@ -25,6 +25,7 @@
       lb-tui = python.pkgs.buildPythonPackage {
         pname = "lb";
         version = "0.1.0";
+        pyproject = true;
         src = ./.;
         propagatedBuildInputs = with python.pkgs; [
           requests
