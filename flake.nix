@@ -15,6 +15,10 @@
       pkgs = nixpkgs.legacyPackages.${system};
       inherit (pkgs) python3;
       inherit (python3.pkgs) buildPythonPackage setuptools wheel requests prompt-toolkit;
+
+      mpv-mpris = pkgs.mpv.override {
+        scripts = [pkgs.mpvScripts.mpris];
+      };
     in {
       packages.default = buildPythonPackage {
         pname = "lb";
@@ -23,8 +27,21 @@
 
         src = ./.;
 
-        nativeBuildInputs = [setuptools wheel];
-        propagatedBuildInputs = [requests prompt-toolkit pkgs.yt-dlp];
+        nativeBuildInputs = [
+          setuptools
+          wheel
+          pkgs.makeWrapper
+        ];
+        propagatedBuildInputs = [
+          requests
+          prompt-toolkit
+          pkgs.yt-dlp
+        ];
+
+        postFixup = ''
+          wrapProgram "$out/bin/lb" \
+            --prefix PATH : ${pkgs.lib.makeBinPath [mpv-mpris]}
+        '';
 
         meta = with pkgs.lib; {
           description = "ListenBrainz TUI music player";
@@ -36,7 +53,7 @@
       devShells.default = pkgs.mkShell {
         buildInputs = [
           (python3.withPackages (ps: with ps; [requests prompt-toolkit yt-dlp]))
-          pkgs.mpv
+          mpv-mpris
         ];
 
         shellHook = ''
@@ -50,7 +67,7 @@
           export PYTHONPATH="$PWD:$PYTHONPATH"
           alias lb='python -m lb'
 
-          echo "🎵 ListenBrainz TUI Music Player"
+          echo "🎵 ListenBrainZ TUI Music Player"
           echo ""
           echo "✅ Ready! Launch with: lb"
         '';
